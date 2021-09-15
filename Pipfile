@@ -1,0 +1,26 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+numpy = "*"
+tensorflow = "*"
+sklearn = "*"
+pandas = "*"
+matplotlib = "*"
+plotly = "*"
+seaborn = "*"
+jupyter = "*"
+jupyterlab = "*"
+jupytext = "*"
+jupyterlab-git = "*"
+lckr-jupyterlab-variableinspector = "*"
+xgboost = "*"
+statsmodels = "*"
+boruta = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.8"
