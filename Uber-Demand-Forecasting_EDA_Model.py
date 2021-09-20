@@ -22,9 +22,9 @@ Image(filename='images/uber-new-york2.jpeg')
 
 # + [markdown] tags=[]
 # ## Table of Contents
-# 1 [ProjectSummary](#1)  
-#     1.1 [Situation](#1.1)  
-#     1.2 [Action and Goal](#1.2)  
+# 1 [Project Overview](#1)  
+#     1.1 [Project Summary](#1.1)  
+#     1.2 [Assumption](#1.2)  
 # 2 [Loading](#2)  
 #     2.1 [Import Libraries](#2.1)  
 #     2.2 [Functions](#2.2)  
@@ -34,46 +34,58 @@ Image(filename='images/uber-new-york2.jpeg')
 #         3.1.1 [Input Variables](#3.1.1)  
 #         3.1.2 [Uber Trip Data](#3.1.2)  
 #         3.1.3 [Weather Data](#3.1.3)  
-#     3.2 [Data Cleaning](#3.2)  
+#     3.2 [Data Preparation for Analysis](#3.2)  
 #     3.3 [Visualisation](#3.3)  
 #     3.4 [Summary of EDA](#3.4)  
 # 4 [Preprocessing](#4)  
-#     4.1 [Data Preparation](#4.1)  
-#     4.2 [Fearture Engineering](#4.2)  
+#     4.1 [Fearture Engineering](#4.1)  
 # 5 [Model Deployment](#5)  
-#     5.1 [Model Development](#5.1)  
+#     5.1 [Baseline Model](#5.1)  
 #     5.2 [Model Tuning](#5.2)  
-#     5.3 [Model Validation](#5.3)  
+#         5.2.1 [Hyper-parameter Tuning](#5.2.1)  
+#         5.2.2 [Feature Selection](#5.2.2)
 # 6 [Deploy](#6)  
+#     6.1 [Feature Importance](#6.1)  
+#     6.2 [Prediction vs True data](#6.2)
 
 # + [markdown] tags=[]
 # <a id="1"></a>
 # ***
 # ***
-# # Project Summary
+# # Project Overview
 # ***
 # -
 
+# <a id="1.1"></a>
+# ***
+# ***
+# ## Project Summary 
+# ***
+
 # ### Situation
-# The demand for rideshearing is drastically growing, especially in large cities. Uber is the first ride-hailing company and has operation in over 900 metropolitan areas worldwide. This project aims to investigate whether weather can make an impact on the demand for Uber rides in New York.  
-#  
-
-#  
-# ### Action and Goal
-# Using the Uber trip data (the mid-6 months of 2014 and the first 6 months of 2015) and the weather data, data exploration and model deployment are implemented by using Python and jupyter notebook. The goal is to build a predictive model and test the hypothesis that ***"Weather makes an impact on the demand for the uber rides in New York"***.
-
-# ARIMA: Auto Regressive Integrated Moving Average
+# The demand for ride-sharing is drastically increasing, especially in large cities. Uber is the first ride-sharing company and has operations in over 900 metropolitan areas worldwide.  As rapidly growing demand and shortage of the vehicle, surge pricing for the rides is concerned these days. It is difficult to forecast the demand with various factors such as weather or public events. 
 
 # + [markdown] tags=[]
-# ## Assumptions
-# ---
-# - Since all boroughs are neighboring the same weather information in NY was used.
-# - Since the available Uber trip data is for only 6 months of 2015, the result might have bias such as seasonal trend and anomary events.
+#  
+# ### Action and Goal
+# Time-series data for the Uber trip (January - June 2015) and the weather was used for exploratory data analysis, visualisation and forecasting model to test the hypothesis. All analysis was implemented on Python and Jupyter Notebook and a forecasting model was developed using a machine learning framework, called **XGBoost**. Using insights obtained from the analyses, this project aims to test the hypothesis **"Weather is a predictor of demand for Uber rides in New York"**.
 # -
 
-# ## Comments(to be rivised)
-# In a more optimized version we may use more localized weather stations but the area is relatively narrow for significant weather differences.
-# Additionally, using information from different stations may enter noise by various factors (like missing values or small calibration differences).
+# ### Results
+# The exploration and the build forecasting model shows that:  
+# - The demand follows specific daily and weekly patterns of hourly Uber rides.
+# - Weather variables did not have any or had very weak impacts on the forecasting model. i.e. the hypothesis was rejected. 
+
+# + [markdown] tags=[]
+# <a id="1.2"></a>
+# ***
+# ***
+# ## Assumptions
+# ***
+# - Since the available data is only for the first 6-month of the year 2015, the forecasting model may not accurately fit the true data.
+# - The seasonality of the data is ignored due to the limited time period of the data.
+# - Since all boroughs are neighbours, the weather information from a single source is used for all boroughs.
+# - The Forecasting is implemented for hourly demand for the rides because the weather data is hourly recorded.
 
 # + [markdown] tags=[]
 # <a id="2"></a>
@@ -173,7 +185,7 @@ def memory_usage(var, lower_limit=0):
 # ***
 # This function provides a summary of data structure in dataframe such as data types, count of the null data and count of the unique values. (See [Profile](#profile))
 
-# + tags=[] jupyter={"source_hidden": true}
+# + tags=[]
 def data_profile(df):
     ''' Data Profile
     This code provides data profile for the inpiut dataframe
@@ -279,10 +291,10 @@ wind_speed = pd.read_csv('data/weather/wind_speed.csv')
 # memory_usage(var, lower_limit=1000)
 
 # + [markdown] tags=[]
+# <a id="3"></a>
 # ***
 # ***
 # # Exploring Data Analysis (EDA) 
-# <a id="3"></a>
 # ***
 
 # + [markdown] tags=[]
@@ -291,7 +303,7 @@ wind_speed = pd.read_csv('data/weather/wind_speed.csv')
 # ***
 # ## Data Overview
 # ***
-# This section provides the overview of the Uber trip data and the weather data.
+# This section provides an overview of the Uber trip data and the weather data.
 
 # + [markdown] tags=[] jp-MarkdownHeadingCollapsed=true
 # <a id="3.1.1"></a>
@@ -314,7 +326,7 @@ wind_speed = pd.read_csv('data/weather/wind_speed.csv')
 # ***
 
 # + [markdown] tags=[]
-# <a id="3.1.1"></a>
+# <a id="3.1.2"></a>
 # ***
 # ### Uber rides data 
 # ***
@@ -365,12 +377,12 @@ data_profile(uber_raw_janjun15)
 
 # <div class='alert-success'>
 #
-# There is no problem with the raw data of the 2015 Uber rides at this stage. No further action required.
+# There is no problem with the raw data of the 2015 Uber rides at this stage. No further action is required.
 #
 # </div>
 
 # + [markdown] tags=[]
-# <a id="3.1.2"></a>
+# <a id="3.1.3"></a>
 # ***
 # ### Weather data 
 # ***
@@ -455,13 +467,13 @@ weather_NY_15.describe().T\
 # <a id="3.2"></a>
 # ***
 # ***
-# ## Data preparation for analysis
+# ## Data Preparation for Analysis
 # ***
-# This section provides required variables and dataframe for further analysis in the later section. The created data is shown below:  
+# This section provides the required variables and dataframe for further analysis in the later section. The created data is shown below:  
 # - df_hourly_rides:  
-# contains the number of rides per hour and the weather information for each time stamp.
+# contains the number of rides per hour and the weather information for each timestamp.
 # - df_hourly_rides_borough:  
-# contains the number of rides per hour by borough and the weather information for each time stamp.
+# contains the number of rides per hour by borough and the weather information for each timestamp.
 
 # + [markdown] tags=[]
 # ### Hourly demand for rides
@@ -594,7 +606,7 @@ plt.savefig(('images/'+figname+'.png'), bbox_inches='tight')
 
 # <div class='alert-info'>
 #
-# 'Proximity thunderstorm', 'thunderstorm with light rain' and 'very heavy rain' have more rides. However, these weather events were probably not often occured. So need to be careful to investigate the correlation.
+# 'Proximity thunderstorm', 'thunderstorm with light rain' and 'very heavy rain' have more rides. However, these weather events were probably not often occurred. So need to be careful to investigate the correlation.
 #
 # </div>
 
@@ -660,7 +672,7 @@ plt.savefig(('images/'+figname+'.png'), bbox_inches='tight')
 # <div class='alert-info'>
 #
 # - January has the lowest number of rides.
-# - June has the highest number of the rides.
+# - June has the highest number of rides.
 #
 # </div>
 
@@ -810,7 +822,7 @@ figname = 'avgN_rides_per_Hour_heatmap_by_Borough'
 plt.savefig(('images/'+figname+'.png'), bbox_inches='tight')
 
 # + [markdown] tags=[]
-# ### Correlation map ------------------ (Need to write Comment)
+# ### Correlation map
 
 # +
 df_corr = df_hourly_rides_borough.copy()
@@ -874,24 +886,31 @@ plt.show()
 # Correlation 
 corr_matt_sub['count'][:]
 
-# ## Key findings from data explorartion
-# ---
+# <a id="3.4"></a>
+# ***
+# ***
+# ## Summary of EDA
+# ***
 # <div class='alert-info'>
 #
-# - It seems that **time variables (time, day of week)** have much stronger effect on demand for the rides than **weather variables**.
+# - It seems that **time variables (time, day of week)** have a much stronger effect on demand for the rides than **weather variables**.
 #
 # </div>
 
 # + [markdown] tags=[]
+# <a id="4"></a>
 # ***
 # ***
 # # Preprocessing 
-# <a id="4"></a>
 # ***
 # Based on the insights obtained from [EDA](#3) and [Visualisation](#4.3), Preprocess the data used in modelling.
 
 # + [markdown] tags=[]
+# <a id="4.1"></a>
+# ***
+# ***
 # ## Feature Engineering
+# ***
 # -
 
 df_hourly_rides.head()
@@ -939,7 +958,7 @@ df_model_rides.columns
 # + [markdown] tags=[]
 # ### Create Lag Features 
 # ---
-# In time series data, at any point in time, the model needs information about the past. Here, to pass the past (most recent) information, lag feature is created.
+# In time series data, at any point in time, the model needs information about the past. Here, to pass the past (most recent) information, the lag feature is created.
 
 # +
 lag_variables = [
@@ -986,16 +1005,16 @@ df_model = df_model.drop(['index'], axis=1)
 
 df_model
 
-# + [markdown] tags=[] jp-MarkdownHeadingCollapsed=true
-# ***
-# ***
-# # Modelling
+# + [markdown] tags=[]
 # <a id="5"></a>
+# ***
+# ***
+# # Model Deployment
 # ***
 #
 
 # +
-# Split the date into test data and Validation data
+# Split the data into test data and Validation data
 
 # Length of test data (days)
 test_length = 30
@@ -1140,7 +1159,11 @@ def prediction_XGBoost(df_train, df_test, model, target_list
 
 target_list = ['count', 'rides_Manhattan', 'rides_Brooklyn', 'rides_Queens']
 
-# ## Create Baseline 
+# <a id="5.1"></a>
+# ***
+# ***
+# ## Baseline Model 
+# ***
 
 
 # Basic Model (Without parameter tuning)
@@ -1148,9 +1171,16 @@ model = XGBRegressor(seed=42)
 
 results1 = prediction_XGBoost(df_train, df_test, model, target_list)
 
-# ## Model Optimization
+# <a id="5.2"></a>
+# ***
+# ***
+# ## Model Tuning
+# ***
 
-# ### Parameter Tuning
+# <a id="5.2.1"></a>
+# ***
+# ### Hyper-parameter Tuning
+# ***
 
 # + tags=[]
 model = XGBRegressor(
@@ -1165,7 +1195,10 @@ model = XGBRegressor(
 
 results2 = prediction_XGBoost(df_train, df_test, model, target_list)
 
+# <a id="5.2.3"></a>
+# ***
 # ### Feature Selection by Boruta 
+# ***
 
 # + tags=[]
 model = XGBRegressor(
@@ -1183,7 +1216,7 @@ results3 = prediction_XGBoost(df_train, df_test, model, target_list, feature_sel
 
 
 
-# + [markdown] tags=[] jp-MarkdownHeadingCollapsed=true
+# + [markdown] tags=[]
 # <a id="6"></a>
 # ***
 # ***
@@ -1254,29 +1287,37 @@ def plot_feat_imp_multi(results, target_list, num_feat=10, label_str=''):
     plt.savefig(('images/'+figname+'.png'),  bbox_inches='tight')
     plt.show()
 
+# <a id="6.1"></a>
+# ***
+# ***
 # ## Feature Importance
+# ***
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true tags=[]
+# + [markdown] tags=[]
 # ### Base Model
 # -
 
 #Base Model
 plot_feat_imp_multi(results1, target_list, label_str='-BaseModel')
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true tags=[]
+# + [markdown] tags=[]
 # ### Tuned Model1 
 # -
 
 plot_feat_imp_multi(results2, target_list, label_str='-TunedModel1')
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true tags=[]
+# + [markdown] tags=[]
 # ### Tuned Model2 
 # -
 
 plot_feat_imp_multi(results3, target_list, label_str='-FeatSelectModel')
 
 
-# ## Predicted values vs True Values
+# <a id="6.2"></a>
+# ***
+# ***
+# ## Predicted vs True Data 
+# ***
 
 # +
 def plot_true_pred(results, target_list, time_block, label_str=''):
@@ -1329,21 +1370,21 @@ def plot_true_pred(results, target_list, time_block, label_str=''):
         
         
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true tags=[]
+# + [markdown] tags=[]
 # ### Base Model
 # -
 
 # Base Model
 plot_true_pred(results1, target_list, time_block)
 
-# + [markdown] jp-MarkdownHeadingCollapsed=true tags=[]
+# + [markdown] tags=[]
 # ### Tuned Model 1 
 # -
 
 # Tuned Model1
 plot_true_pred(results2, target_list, time_block)
 
-# + [markdown] tags=[] jp-MarkdownHeadingCollapsed=true
+# + [markdown] tags=[]
 # ### Tuned Model 2
 # -
 
