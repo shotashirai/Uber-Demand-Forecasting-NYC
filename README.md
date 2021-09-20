@@ -1,5 +1,5 @@
 # Uber Demand Forecasting in NY
-![UberNewYork](images/uber_NY.jpg)
+![UberNewYork](images/uber_NY2.jpg)
 ## Project Summary
 **Situation**  
 The demand for ride-sharing is drastically increasing, especially in large cities. Uber is the first ride-sharing company and has operations in over 900 metropolitan areas worldwide.  As rapidly growing demand and shortage of the vehicle, surge pricing for the rides is concerned these days. It is difficult to forecast the demand with various factors such as weather or public events. 
