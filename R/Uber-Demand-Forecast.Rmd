@@ -1,0 +1,338 @@
+---
+ttitle: "Uber Demand Forecasting in New York City"
+author: "Shota Shirai"
+date: "19/11/2021"
+output: 
+  html_document:
+    keep_md: yes
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+  md_document:
+    toc: yes
+    toc_depth: 2
+    variant: markdown_github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.path = "./figures/")
+```
+
+# Project Overview
+
+## Situation
+The demand for ride-sharing is drastically increasing, especially in large cities. Uber is the first ride-sharing company and has operations in over 900 metropolitan areas worldwide. As rapidly growing demand and shortage of the vehicle, surge pricing for the rides is concerned these days. It is difficult to forecast the demand with various factors such as weather or public events.
+
+## Action and Goal
+Time-series data for the Uber trip (January - June 2015) was used for exploratory data analysis, visualisation and forecasting model to test the hypothesis. All analysis was implemented on R and R Markdown and a forecasting model was developed using a traditional statistical model, Seasonal Autoregressive Integrated Moving Average (SARIMA) and Linear Regression model. The accuracy of the prediction was measured by MAPE (Mean Absolute Percentage Error).
+
+# Loading
+
+## Loading libraries
+All loaded libraries for this analysis are shown below.
+```{r Load_libraries, include=FALSE}
+library("readr")
+library("dplyr")
+library("stringr")
+library("tidyverse")
+library("data.table")
+library("gridExtra")
+library("patchwork")
+library("caret")
+library("fastDummies")
+library("forecast")
+library("plotly")
+library("tseries")
+library("ggplot2")
+library("here")
+library("MLmetrics")
+```
+
+```{r list of loaded libraries, echo=FALSE}
+(.packages())
+```
+
+# Import data
+All data used in this project is stored in "data" directory. Uber trip data from 2015 (January - June): with less fine-grained location information. This data contains 14.3 million more Uber pickups from January to June 2015.
+
+- uber-raw-data-janjune-15.csv.zip
+
+**(Data Source)**  
+The data shown above can be obtained from:  
+Uber trip data: https://github.com/fivethirtyeight/uber-tlc-foil-response
+
+```{r Load_data, include=FALSE}
+# ** Uber data ######################################################################
+
+# Uber ride raw data
+uber_raw <- read_csv(here(dirname(getwd()), "/data/uber-raw-data-janjune-15.csv.zip"))
+
+# Reference for borough in NY
+borough_ref <- read_csv(here(dirname(getwd()), "/data/taxi-zone-lookup.csv"), 
+                        col_select = c("LocationID", "Borough"))
+names(borough_ref) = c('locationID', "Borough") # Rename columns
+
+# Define borough in Uber_data using borough_ref
+uber_raw <- merge(uber_raw, borough_ref, by="locationID")
+uber_raw <- uber_raw[, c("Pickup_date", "Borough")] # Rename columns
+
+uber_raw <- uber_raw %>%
+  mutate(pickup_cnt = 1) %>% # Pick up count
+  mutate(datetime = format(Pickup_date, "%Y-%m-%d %H:00:00")) # Format datetime
+```
+
+```{r Data_Preparation, include=FALSE}
+
+uber.hourly <- uber_raw %>%
+  group_by(Borough, datetime) %>%
+  dplyr::summarise(pickup = sum(pickup_cnt))
+
+# ** Total pickups by boroughs
+uber.total <- uber_raw %>%
+  group_by(Borough) %>%
+  dplyr::summarise(pickup = sum(pickup_cnt)) %>%
+  mutate(prop_pickup = pickup / sum(pickup) * 100)
+
+# ** Hourly uber trip by borough
+uber.borough <- uber.hourly %>%
+  spread(Borough, pickup) %>%  # Reshape the dataframe 
+  mutate(All_boroughs = rowSums(.[,2:8], na.rm = TRUE)) %>% # Total pickup in NY
+  replace(is.na(.),0) # Repalce NA with 0
+names(uber.borough) <- gsub(" ", "_", colnames(uber.borough))
+
+# ** Average pick-up by day of weekｄ
+uber.wday <- uber.hourly %>%
+  mutate(Weekday = format(as.Date(datetime), "%a"),
+         Hour = hour(datetime)) %>%
+  group_by(Hour, Weekday, Borough) %>%
+  dplyr::summarise(avg_pickup = mean(pickup)) %>%
+  spread(Borough, avg_pickup) %>%
+  ungroup() %>%
+  mutate(All_boroughs = rowSums(.[,3:9], na.rm = TRUE)) %>% # Total pickup in NY
+  replace(is.na(.),0) # Repalce NA with 0
+names(uber.wday) <- gsub(" ", "_", colnames(uber.wday))
+
+uber.wday$Weekday <- factor(uber.wday$Weekday,
+                            levels= c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))
+uber.wday <- uber.wday[order(uber.wday$Weekday), ]
+```
+
+# Visualisation
+
+## Number of rides by borough
+
+```{r Vis: Number of Rides, echo=FALSE}
+p0 <- ggplot(uber.total, aes(x=Borough, y=pickup, fill=Borough)) +
+  geom_bar(stat="identity") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none") +
+  scale_fill_brewer(palette="Set1") 
+  # scale_colour_tableau()
+
+p1 <- ggplot(uber.total, aes(x="", y=prop_pickup, fill=Borough)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) + 
+  theme_void() + 
+  # geom_text(aes(y = ypos, label = group), color = "white", size=6) +
+  scale_fill_brewer(palette="Set1")
+  
+p0 + p1
+```
+Manhattan has the most populous county followed by Brooklyn and Queens.
+
+## Number of rides by day of week
+
+```{r Visualisation, echo=FALSE}
+h0 <- ggplot(uber.wday, aes(x=Weekday, y=Hour, fill=All_boroughs)) + 
+  geom_tile() + 
+  scale_fill_distiller(palette='RdBu')
+
+h1 <- ggplot(uber.wday, aes(x=Weekday, y=Hour, fill=Manhattan)) + 
+  geom_tile() + 
+  scale_fill_distiller(palette='RdBu')
+
+h2 <- ggplot(uber.wday, aes(x=Weekday, y=Hour, fill=Brooklyn)) + 
+  geom_tile() + 
+  scale_fill_distiller(palette='RdBu')
+
+h3 <- ggplot(uber.wday, aes(x=Weekday, y=Hour, fill=Queens)) + 
+  geom_tile() + 
+  scale_fill_distiller(palette='RdBu')
+
+h4 <- ggplot(uber.wday, aes(x=Weekday, y=Hour, fill=Bronx)) + 
+  geom_tile() +
+  scale_fill_distiller(palette='RdBu')
+
+h5 <- ggplot(uber.wday, aes(x=Weekday, y=Hour, fill=Staten_Island)) + 
+  geom_tile() +
+  scale_fill_distiller(palette='RdBu')
+
+h6 <- ggplot(uber.wday, aes(x=Weekday, y=Hour, fill=EWR)) + 
+  geom_tile() +
+  scale_fill_distiller(palette='RdBu')
+
+(h0 | h1)  / (h2 | h3)
+
+h4 + h5 + h6 +
+  plot_layout(ncol=2)
+```
+
+# Modelling
+
+The Uber rides in Manhattan that is the most popular area are used for builing model and examine prediction results.
+## Preprocessing for modelling
+
+```{r Preprocessing, echo=FALSE, include=FALSE}
+uber.model <- uber.borough %>%
+  mutate(Weekday = wday(as.Date(datetime, label = TRUE)),
+         Hour = hour(datetime))
+
+# Manhattan ######################################################################
+# Create lag variables
+uber.model.Manhattan <- uber.model[,c("datetime", "Hour", "Weekday", "Manhattan")] %>%
+  mutate(`1h` = lag(Manhattan),
+         `2h` = lag(Manhattan, 2),
+         `3h` = lag(Manhattan, 3),
+         `1d` = lag(Manhattan, 24),
+         `1w` = lag(Manhattan, 168))
+
+##
+uber.Manhattan.train <- uber.model.Manhattan %>%
+  filter(datetime < '2015-06-01') %>%
+  drop_na()
+
+uber.Manhattan.test <- uber.model.Manhattan %>%
+  filter(datetime >= '2015-06-01')
+##
+```
+
+## Stationarity of the data
+To check the stationarity of a time series, a statistica test, **Augmented Dickey-Fuller (ADF) test**, is used. The hypothesesis of the ADF test:  
+**Null Hypothesis**: The time series displays a unit-root, which means the time series is non-stationary.  
+**Alternative Hypothesis**: There is no unit-root in the time series, meaning the time series is stationary.
+```{r Stationarity, echo=FALSE}
+manhattan.ts <- ts(as.numeric(uber.Manhattan.train$Manhattan), frequency = 24)
+manhattan.stl <- stl(manhattan.ts, s.window = "periodic")
+plot(manhattan.stl)
+adf.test(manhattan.ts)
+```
+The result of the ADF test shows p-value = 0.01 < 0.05, meaning the null hypothesis was rejected. So the time series data of the Uber rides in Mahnattan is concluded as **statinary**.
+
+## SARIMA (Seasonal Auto Regressive Integrated Moving Average)
+```{r parameters for SARIMA, echo=FALSE}
+manhattan.arima <- auto.arima(manhattan.ts, trace = T, stepwise = T, seasonal = T)
+```
+
+```{r SARIMA}
+manhattan.pred.arima <-forecast(manhattan.arima, h=720)
+plot(forecast(manhattan.arima,range=c(50,95),h=720))
+```
+
+
+```{r MAPE}
+mape_arima <- MAPE(manhattan.pred.arima[["mean"]], uber.Manhattan.test$Manhattan) * 100
+print(paste("MAPE (SARIMA Model):", round(mape_arima,3), "%"))
+```
+
+## Linear Model
+
+```{r Generaized Linear Model, echo=TRUE}
+
+# ** Linear model ####
+
+# Base model
+lm0 <- lm(Manhattan ~ Weekday + Hour,
+          data = uber.Manhattan.train)
+
+# Add lag features
+lm1 <- update(lm0, ~ . + `1h` + `2h` + `3h` + `1d` + `1w`)
+pred1 <- predict(lm1, newdata = uber.Manhattan.test)
+
+# MAPE
+mape_lm <- MAPE(pred1, uber.Manhattan.test$Manhattan) * 100
+print(paste("MAPE (Linear Model):", round(mape_lm, 3), "%"))
+```
+
+# Deployment
+```{r Vis-Results, include=FALSE}
+result1 <- uber.Manhattan.test[, c("datetime", "Manhattan")] %>%
+  mutate(
+    datetime = as.POSIXct(datetime),
+    Pred_pickup = pred1,
+    pred_arima = manhattan.pred.arima[["mean"]])
+# #Visualisation
+# vis_res <- ggplot(result1, aes(datetime, Manhattan)) + 
+#   geom_line(color='red') +
+#   geom_line(aes(datetime, Pred_pickup), color='blue') +
+#   geom_line(aes(datetime, pred_arima), color='green') +
+#   scale_x_datetime(date_breaks = '5 day')
+# ggplotly(vis_res)
+```
+
+```{r Vis-Results-weekly, echo=FALSE}
+res1 <- uber.Manhattan.test[, c("datetime", "Manhattan")] %>%
+  mutate(
+    datetime = as.POSIXct(datetime),
+    Pred_pickup = pred1,
+    pred_arima = manhattan.pred.arima[["mean"]]) %>%
+  filter(datetime > '2015-06-01' & datetime <= '2015-06-08')
+
+res2 <- uber.Manhattan.test[, c("datetime", "Manhattan")] %>%
+  mutate(
+    datetime = as.POSIXct(datetime),
+    Pred_pickup = pred1,
+    pred_arima = manhattan.pred.arima[["mean"]]) %>%
+  filter(datetime > '2015-06-08' & datetime <= '2015-06-15')
+
+res3 <- uber.Manhattan.test[, c("datetime", "Manhattan")] %>%
+  mutate(
+    datetime = as.POSIXct(datetime),
+    Pred_pickup = pred1,
+    pred_arima = manhattan.pred.arima[["mean"]]) %>%
+  filter(datetime > '2015-06-15' & datetime <= '2015-06-22')
+
+res4 <- uber.Manhattan.test[, c("datetime", "Manhattan")] %>%
+  mutate(
+    datetime = as.POSIXct(datetime),
+    Pred_pickup = pred1,
+    pred_arima = manhattan.pred.arima[["mean"]]) %>%
+  filter(datetime > '2015-06-22' & datetime <= '2015-06-30')
+
+vis_res1 <- ggplot(res1, aes(datetime, Manhattan, color='True value')) + 
+  geom_line() +
+  geom_line(aes(datetime, Pred_pickup, color='Linear model')) +
+  geom_line(aes(datetime, pred_arima,  color='SARIMA')) +
+  scale_x_datetime(date_breaks = '1 day') +
+  scale_color_manual(name = "Uber rides", values = c("True value" = "blue", "Linear model" = "red", "SARIMA" = "darkgreen")) +
+  theme(legend.position = "top")
+
+vis_res2 <- ggplot(res2, aes(datetime, Manhattan, color='True value')) + 
+  geom_line() +
+  geom_line(aes(datetime, Pred_pickup, color='Linear model')) +
+  geom_line(aes(datetime, pred_arima,  color='SARIMA')) +
+  scale_x_datetime(date_breaks = '1 day') +
+  scale_color_manual(name = "Uber rides", values = c("True value" = "blue", "Linear model" = "red", "SARIMA" = "darkgreen")) +
+  theme(legend.position = "none")
+
+vis_res3 <- ggplot(res3, aes(datetime, Manhattan, color='True value')) + 
+  geom_line() +
+  geom_line(aes(datetime, Pred_pickup, color='Linear model')) +
+  geom_line(aes(datetime, pred_arima,  color='SARIMA')) +
+  scale_x_datetime(date_breaks = '1 day') +
+  scale_color_manual(name = "Uber rides", values = c("True value" = "blue", "Linear model" = "red", "SARIMA" = "darkgreen")) +
+  theme(legend.position = "none")
+
+vis_res4 <- ggplot(res4, aes(datetime, Manhattan, color='True value')) + 
+  geom_line() +
+  geom_line(aes(datetime, Pred_pickup, color='Linear model')) +
+  geom_line(aes(datetime, pred_arima,  color='SARIMA')) +
+  scale_x_datetime(date_breaks = '1 day') +
+  scale_color_manual(name = "Uber rides", values = c("True value" = "blue", "Linear model" = "red", "SARIMA" = "darkgreen")) +
+  theme(legend.position = "bottom")
+#Visualisation
+vis_res1 / vis_res2 
+vis_res3 / vis_res4
+
+```
+
