@@ -4,29 +4,18 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-numpy = "*"
-tensorflow = "*"
-sklearn = "*"
-pandas = "*"
-matplotlib = "*"
-plotly = "*"
-seaborn = "*"
-jupyter = "*"
 jupyterlab = "*"
-jupytext = "*"
-jupyterlab-git = "*"
-lckr-jupyterlab-variableinspector = "*"
-xgboost = "*"
-statsmodels = "*"
+pandas = "*"
+seaborn = "*"
+matplotlib = "*"
 boruta = "*"
-typing-extensions = "*"
+sklearn = "*"
+xgboost = "*"
+lightgbm = "*"
+jupyterlab-git = "*"
+plotly = "*"
 
 [dev-packages]
-flake8 = "*"
-black = "*"
 
 [requires]
 python_version = "3.8"
-
-[pipenv]
-allow_prereleases = true
